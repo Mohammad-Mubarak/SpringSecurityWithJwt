@@ -1,0 +1,112 @@
+import React, { useState } from "react";
+import axios from "axios";
+import { useRecoilState } from "recoil";
+import { AuthState } from "../AuthState";
+import "./Login.css";
+
+function LoginForm() {
+	const [username, setUsername] = useState("");
+	const [password, setPassword] = useState("");
+	const [authCookie, setAuthCookie] = useRecoilState(AuthState);
+
+	const handleSubmit = async (event) => {
+		event.preventDefault();
+		try {
+			const authHeader = "Basic " + btoa(username + ":" + password);
+			const response = await axios.get(
+				"http://localhost:3000/login/user",
+				{
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: authHeader,
+						"X-Requested-With": "XMLHttpRequest",
+					},
+					withCredentials: true,
+				}
+			);
+			if (
+				response.status === 200 &&
+				!response.data.includes("Please sign in")
+			) {
+				const bearerToken = response.headers["authorization"];
+
+				document.cookie = `bearerToken=${bearerToken}; path=/;`;
+				document.cookie = "auth=true; path=/;";
+				setAuthCookie(true);
+				console.log("Authentication successful");
+			} else {
+				console.error("Authentication failed");
+			}
+		} catch (error) {
+			if (error.response && error.response.status === 401) {
+				console.error("Authentication failed: Invalid credentials");
+			} else {
+				console.error("Error:", error);
+			}
+		}
+	};
+
+	const getCookie = (name) => {
+		const value = `; ${document.cookie}`;
+		const parts = value.split(`; ${name}=`);
+		if (parts.length === 2) return parts.pop().split(";").shift();
+		return null;
+	};
+
+	// Usage
+	const bearerToken = getCookie("bearerToken");
+	if (bearerToken) {
+		console.log("Bearer Token:", bearerToken);
+	} else {
+		console.error("Bearer token cookie not found");
+	}
+
+	const callAPI = async () => {
+		try {
+			const response = await axios.get(
+				"http://localhost:3000/register/user",
+				{
+					headers: {
+						"X-Requested-With": "XMLHttpRequest",
+						Authorization: "Bearer " + bearerToken,
+					},
+					withCredentials: true,
+				}
+			);
+
+			console.log(response.data);
+		} catch (error) {
+			if (error.response && error.response.status === 401) {
+				alert("Authentication failed: Invalid credentials");
+			} else {
+				console.error("Error:", error);
+			}
+		}
+	};
+
+	return (
+		<div className="login-container">
+			<form className="login-form" onSubmit={handleSubmit}>
+				<h2>Login</h2>
+				<input
+					type="text"
+					placeholder="Username"
+					value={username}
+					onChange={(event) => setUsername(event.target.value)}
+				/>
+				<input
+					type="password"
+					placeholder="Password"
+					value={password}
+					onChange={(event) => setPassword(event.target.value)}
+				/>
+				<button type="submit">Submit</button>
+			</form>
+			<button className="api-button" onClick={callAPI}>
+				Call API
+			</button>
+		</div>
+	);
+}
+
+export default LoginForm;
